@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pizzaclaw-onboard
+  labels:
+    app: pizzaclaw
+spec:
+  restartPolicy: Never
+  containers:
+    - name: onboard
+      image: pizzaclaw:latest
+      imagePullPolicy: Never
+      args: ["onboard"]
+      stdin: true
+      tty: true
+      volumeMounts:
+        - name: pizzaclaw-data
+          mountPath: /root/.nanobot
+  volumes:
+    - name: pizzaclaw-data
+      persistentVolumeClaim:
+        claimName: pizzaclaw-data

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pizzaclaw
+  labels:
+    app: pizzaclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pizzaclaw
+  template:
+    metadata:
+      labels:
+        app: pizzaclaw
+    spec:
+      containers:
+        - name: pizzaclaw
+          image: pizzaclaw:1.1
+          imagePullPolicy: Never
+          args: ["gateway"]
+          ports:
+            - containerPort: 18790
+              name: http
+          volumeMounts:
+            - name: pizzaclaw-data
+              mountPath: /root/.nanobot
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: pizzaclaw-data
+          persistentVolumeClaim:
+            claimName: pizzaclaw-data

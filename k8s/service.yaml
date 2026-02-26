@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pizzaclaw
+  labels:
+    app: pizzaclaw
+spec:
+  type: ClusterIP
+  selector:
+    app: pizzaclaw
+  ports:
+    - name: http
+      port: 18790
+      targetPort: 18790
