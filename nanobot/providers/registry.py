@@ -51,6 +51,12 @@ class ProviderSpec:
     # per-model param overrides, e.g. (("kimi-k2.5", {"temperature": 1.0}),)
     model_overrides: tuple[tuple[str, dict[str, Any]], ...] = ()
 
+    # Optional nested key path under message.provider_specific_fields that
+    # contains reasoning text for LiteLLM responses.
+    # Example: ("reasoning", "content") extracts
+    # provider_specific_fields["reasoning"]["content"].
+    reasoning_from_provider_specific_fields: tuple[str, ...] = ()
+
     # OAuth-based providers (e.g., OpenAI Codex) don't use API keys
     is_oauth: bool = False                   # if True, uses OAuth flow instead of API key
 

@@ -10,7 +10,7 @@ from litellm import acompletion
 from loguru import logger
 
 from nanobot.providers.base import LLMProvider, LLMResponse, ToolCallRequest
-from nanobot.providers.registry import find_by_model, find_gateway
+from nanobot.providers.registry import ProviderSpec, find_by_model, find_gateway
 
 
 # Standard OpenAI chat-completion message keys plus reasoning_content for
@@ -187,6 +187,7 @@ class LiteLLMProvider(LLMProvider):
             LLMResponse with content and/or tool calls.
         """
         original_model = model or self.default_model
+        active_spec = self._gateway or find_by_model(original_model)
         model = self._resolve_model(original_model)
 
         if self._supports_cache_control(original_model):
@@ -225,7 +226,7 @@ class LiteLLMProvider(LLMProvider):
         try:
             response = await acompletion(**kwargs)
             self._log_raw_response(response)
-            return self._parse_response(response)
+            return self._parse_response(response, active_spec)
         except Exception as e:
             # Return error as content for graceful handling
             return LLMResponse(
@@ -251,7 +252,50 @@ class LiteLLMProvider(LLMProvider):
 
         logger.debug("Raw LiteLLM API response: {}", raw)
 
-    def _parse_response(self, response: Any) -> LLMResponse:
+    @staticmethod
+    def _to_mapping(value: Any) -> dict[str, Any] | None:
+        """Best-effort convert provider payload objects to plain dicts."""
+        if isinstance(value, dict):
+            return value
+        if hasattr(value, "model_dump"):
+            dumped = value.model_dump()
+            return dumped if isinstance(dumped, dict) else None
+        if hasattr(value, "dict"):
+            dumped = value.dict()
+            return dumped if isinstance(dumped, dict) else None
+        return None
+
+    @classmethod
+    def _extract_reasoning_from_provider_specific_fields(
+        cls,
+        message: Any,
+        path: tuple[str, ...],
+    ) -> str | None:
+        """Extract reasoning text from nested provider_specific_fields path."""
+        if not path:
+            return None
+
+        provider_fields = getattr(message, "provider_specific_fields", None)
+        if provider_fields is None and isinstance(message, dict):
+            provider_fields = message.get("provider_specific_fields")
+
+        node: Any = cls._to_mapping(provider_fields)
+        for key in path:
+            if not isinstance(node, dict):
+                return None
+            node = node.get(key)
+
+        if node is None:
+            return None
+        if isinstance(node, str):
+            return node or None
+
+        try:
+            return json.dumps(node, ensure_ascii=False, default=str)
+        except Exception:
+            return str(node)
+
+    def _parse_response(self, response: Any, spec: ProviderSpec | None) -> LLMResponse:
         """Parse LiteLLM response into our standard format."""
         choice = response.choices[0]
         message = choice.message
@@ -279,6 +323,12 @@ class LiteLLMProvider(LLMProvider):
             }
 
         reasoning_content = getattr(message, "reasoning_content", None) or None
+        if not reasoning_content:
+            if spec is not None:
+                reasoning_content = self._extract_reasoning_from_provider_specific_fields(
+                    message,
+                    spec.reasoning_from_provider_specific_fields,
+                )
 
         return LLMResponse(
             content=message.content,
