@@ -234,6 +234,7 @@ async def _iter_sse(response: httpx.Response) -> AsyncGenerator[dict[str, Any], 
                 data = "\n".join(data_lines).strip()
                 if not data or data == "[DONE]":
                     continue
+                logger.debug("Raw Codex SSE event: {}", data)
                 try:
                     yield json.loads(data)
                 except Exception:
